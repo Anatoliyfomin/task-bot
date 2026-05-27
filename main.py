@@ -1,8 +1,10 @@
 import os
 import json
 import logging
-from datetime import datetime
 import telebot
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
 from telebot import types
 from flask import Flask, request, abort
 
@@ -11,7 +13,7 @@ TOKEN = os.environ.get("Telegram_token")
 SPREADSHEET_ID = os.environ.get("spreasheet_id")
 GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
 
-ADMINS = [5587445993, 8214573175, 6918277580]   # ← Замени, если нужно
+ADMINS = [5587445993, 8214573175, 6918277580]   # ← Можно изменить
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,14 +27,9 @@ sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-PREDEFINED_OBJECTS = [
-    "Кирпичная",
-    "Ольминского",
-    "Ярославская",
-    "Черницынский"
-]
-
 DEADLINE_FORMAT = "%d.%m.%Y"
+PREDEFINED_OBJECTS = ["Кирпичная", "Ольминского", "Ярославская", "Черницынский"]
+
 pending_tasks = {}  # user_id → task_text
 
 def is_admin(user_id):
@@ -70,7 +67,50 @@ def handle_text(message):
             bot.register_next_step_handler(sent, ask_object)
         else:
             bot.send_message(message.chat.id, "⛔ Только администраторы могут добавлять задачи.")
-    # ... остальные обработчики
+    elif text == "🔍 Поиск":
+        sent = bot.send_message(message.chat.id, "Что ищем?")
+        bot.register_next_step_handler(sent, search_task)
+    elif text == "ℹ️ Помощь":
+        bot.send_message(message.chat.id, "Выберите объект для просмотра задач.", reply_markup=main_menu())
+    else:
+        if is_admin(user_id):
+            sent = bot.send_message(message.chat.id, "📝 Напишите задачу:")
+            bot.register_next_step_handler(sent, ask_object)
+
+# ================= ОСНОВНЫЕ ФУНКЦИИ =================
+def ask_object(message):
+    task_text = message.text.strip()
+    pending_tasks[message.from_user.id] = task_text
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    for i, obj in enumerate(PREDEFINED_OBJECTS):
+        markup.add(types.InlineKeyboardButton(f"🏢 {obj}", callback_data=f"pickobj_{i}"))
+    bot.send_message(message.chat.id, f"📝 *{task_text}*\n\n🏢 Выберите объект:", parse_mode="Markdown", reply_markup=markup)
+
+def save_new_task(message, task_text, obj_name):
+    raw = message.text.strip()
+    deadline = raw if raw.lower() not in ("нет", "no", "-", "") else ""
+    date = datetime.now().strftime("%d.%m.%Y %H:%M")
+    sheet.append_row([date, task_text, "Не начато", deadline, obj_name])
+    bot.send_message(message.chat.id, "✅ Задача добавлена!", reply_markup=main_menu())
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    try:
+        parts = call.data.split("_")
+        action = parts[0]
+        if action == "pickobj":
+            obj_idx = int(parts[1])
+            user_id = call.from_user.id
+            task_text = pending_tasks.pop(user_id, None)
+            if not task_text:
+                bot.answer_callback_query(call.id, "Сессия истекла.")
+                return
+            obj_name = PREDEFINED_OBJECTS[obj_idx] if obj_idx < len(PREDEFINED_OBJECTS) else "Без объекта"
+            bot.answer_callback_query(call.id, f"🏢 {obj_name}")
+            sent = bot.send_message(call.message.chat.id, "📅 Укажите дедлайн (например: 31.12.2026)\nИли напишите «нет»:", parse_mode="Markdown")
+            bot.register_next_step_handler(sent, lambda m: save_new_task(m, task_text, obj_name))
+    except:
+        pass
 
 print("🤖 Бот запущен на Render!")
 
