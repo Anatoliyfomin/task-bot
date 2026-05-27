@@ -12,11 +12,16 @@ TOKEN = os.environ.get("Telegram_token")
 SPREADSHEET_ID = os.environ.get("spreasheet_id")
 GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
 
-print("✅ Переменные загружены")
+# ================= ИСПРАВЛЕННЫЕ SCOPES =================
+SCOPES = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file"
+]
 
-# Подключение к Google Sheets
+# Подключение
 creds_dict = json.loads(GOOGLE_CREDENTIALS)
-creds = Credentials.from_service_account_info(creds_dict)
+creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
@@ -34,7 +39,7 @@ def webhook():
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "✅ Бот успешно запущен на Render!")
+    bot.send_message(message.chat.id, "✅ Бот успешно запущен!")
 
 print("🤖 Бот запущен!")
 
