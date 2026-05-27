@@ -14,9 +14,16 @@ GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
 
 ADMINS = [5587445993, 8214573175, 6918277580]   # ← Можно изменить
 
+# ================= РАБОЧИЕ SCOPES =================
+SCOPES = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
 # Подключение
 creds_dict = json.loads(GOOGLE_CREDENTIALS)
-creds = Credentials.from_service_account_info(creds_dict)
+creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
