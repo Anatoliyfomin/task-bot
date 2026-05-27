@@ -12,18 +12,11 @@ TOKEN = os.environ.get("Telegram_token")
 SPREADSHEET_ID = os.environ.get("spreasheet_id")
 GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
 
-ADMINS = [5587445993, 8214573175, 6918277580]
-
-# ================= РАБОЧИЕ SCOPES =================
-SCOPES = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+ADMINS = [5587445993, 8214573175, 6918277580]   # ← Можно изменить
 
 # Подключение
 creds_dict = json.loads(GOOGLE_CREDENTIALS)
-creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+creds = Credentials.from_service_account_info(creds_dict)
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
@@ -31,7 +24,7 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 PREDEFINED_OBJECTS = ["Кирпичная", "Ольминского", "Ярославская", "Черницынский"]
-pending_tasks = {}
+pending_tasks = {}  # user_id → task_text
 
 def is_admin(user_id):
     return user_id in ADMINS
